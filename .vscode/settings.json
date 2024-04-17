@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "time.h": "c",
+        "random": "c",
+        "cstdlib": "c"
+    }
+}
