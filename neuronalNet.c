@@ -22,7 +22,7 @@ typedef struct{
 
 static void __w(float *w, unsigned int n){
     for (unsigned int l = 0; l < n; l++) {
-        w[l] = (float)rand()/ RAND_MAX;
+        w[l] = ((float)rand()/ RAND_MAX)-0.5f;
         //printf("w[%i] = %f\n", l, w[l]);
     }
 }
@@ -38,30 +38,6 @@ float neuron(float *x,
     }
     return result;
 }
-
-// float cal(Model model, float x){
-//     Sequential sequential = model.sequential;
-//     unsigned int length = 3;
-//     float **b = model.b;
-//     float ***w = model.w;
-//     float **neu = (float **) malloc(sizeof(float *)*length);
-//     Layer layer;
-//     for(unsigned int i = 0; i < length; i++){
-//         layer = sequential[i];
-//         if(i == 0){
-//             for(unsigned int j = 0; j < layer.neurons; j++){
-//                 neu[0][j] = x;
-//             }
-//             continue;
-//         }
-//         for(unsigned int j = 0; j < layer.neurons; j++){
-//             fo
-//             neu[i][j] = neuron(neu[i-1], w[i-1][j][k], b[i-1], sequential[i-1].neurons, layer.activacion);
-//         }
-//     }
-//     return neu[length - 1][0];
-// }
-
 
 Model *fit(float **x, 
                 float **y, 
@@ -94,17 +70,13 @@ Model *fit(float **x,
             }
         }
     }
-    printf("93 funciona\n");
     while(epochs--){
         for(int a = 0; a < n; a++){
-            for(unsigned int i = 0; i < length; i++){
+            for(unsigned int j = 0; j < sequential[0].neurons; j++){
+                neu[0][j] = x[a][j];
+            }
+            for(unsigned int i = 1; i < length; i++){
                 layer = sequential[i];
-                if(i == 0){
-                    for(unsigned int j = 0; j < layer.neurons; j++){
-                        neu[0][j] = x[a][j];
-                    }
-                    continue;
-                }
                 //printf("sequential[%i] = %i, sequential[%i] = %i\n", i, layer.neurons, i-1, sequential[i-1].neurons);
                 for(unsigned int j = 0; j < layer.neurons; j++){
                     for(unsigned int k = 0; k < sequential[i-1].neurons; k++){
@@ -119,22 +91,20 @@ Model *fit(float **x,
             if(layer.neurons == 1)
                 printf("error: %f, prediccion: %f, y:%f\n", err, neu[length-1][0], y[a][0]);
             float delta = 1;
-            Layer before;
-            for(int i = length - 1;i > 0; i--){
+            layer = sequential[length - 1];
+            Layer before = sequential[length-2];
+            for(int j = 0; j < before.neurons; j++){
+                for(int k = 0; k < layer.neurons; k++){
+                    delta = neuron(neu[length-2], w[length-2][j][k], b[length-2], before.neurons, before.derivada);
+                    deltas[length-2][j][k] = devError(neu[length-1][k], y[a][k]) * delta;
+                    delta = learning_rate * deltas[length-2][j][k] * delta;
+                    w[length-2][j][k] -= delta*neu[length-2][j];
+                    b[length-2][j] -= delta;
+                }
+            }
+            for(int i = length - 2;i > 0; i--){
                 layer = sequential[i];
                 before = sequential[i-1];
-                if(i == length - 1){
-                    for(int j = 0; j < before.neurons; j++){
-                        for(int k = 0; k < layer.neurons; k++){
-                            delta = neuron(neu[i-1], w[i-1][j][k], b[i-1], before.neurons, before.derivada);
-                            deltas[i-1][j][k] = devError(neu[length-1][k], y[a][k]) * delta;
-                            delta = learning_rate * deltas[i-1][j][k] * delta;
-                            w[i-1][j][k] -= delta*neu[i-1][j];
-                            b[i-1][j] -= delta;
-                        }
-                    }
-                    continue;
-                }
                 for(int j = 0; j < before.neurons; j++){
                     for(int k = 0; k < layer.neurons; k++){
                         delta = neuron(neu[i-1], w[i-1][j][k], b[i-1], before.neurons, before.derivada);
