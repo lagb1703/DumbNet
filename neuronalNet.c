@@ -1,5 +1,4 @@
 #include "optimizadores.c"
-#define learning_rate 0.01
 
 typedef struct
 {
@@ -22,7 +21,8 @@ static void __w(float *w, unsigned int n)
 {
     for (unsigned int l = 0; l < n; l++)
     {
-        w[l] = ((float)rand() / RAND_MAX) - 0.5f;
+        // w[l] = ((float)rand() / RAND_MAX) - 0.5f;
+        w[l] = 0.5;
         printf("[%i] = %f\n", l, w[l]);
     }
 }
@@ -36,15 +36,16 @@ float neuron(float *x,
     float result = 0;
     while (n--)
     {
-        result += activacion(x[n] * w[n] + b[n]);
+        result += x[n] * w[n] + b[n];
     }
-    return result;
+    return activacion(result);
 }
 
 Model *fit(float **x,
            float **y,
            unsigned int n,
            unsigned int epochs,
+           float learningRate,
            Sequential sequential,
            float (*error)(float *, float *, int),
            float (*devError)(float *, float *, int),
@@ -71,7 +72,6 @@ Model *fit(float **x,
                 b[i][j] = InitB;
                 w[i][j] = (float *)malloc(sizeof(float) * (sequential[i + 1].neurons));
                 deltas[i][j] = (float *)malloc(sizeof(float) * (sequential[i + 1].neurons));
-                // printf("%i %i\n", i, j);
                 printf("w[%i][%i]", i, j);
                 __w(w[i][j], sequential[i + 1].neurons);
             }
@@ -93,7 +93,6 @@ Model *fit(float **x,
             {
                 printf("capa  %i\n", i);
                 layer = sequential[i];
-                // printf("sequential[%i] = %i, sequential[%i] = %i\n", i, layer.neurons, i-1, sequential[i-1].neurons);
                 for (unsigned int j = 0; j < layer.neurons; j++)
                 {
                     float *sw = (float *)malloc(sizeof(float) * sequential[i - 1].neurons);
@@ -105,13 +104,12 @@ Model *fit(float **x,
                     free(sw);
                     printf("neu[%i][%i] = %f\n", i, j, neu[i][j]);
                 }
-                // printf("\n");
+                printf("\n");
             }
-            // printf("109 funciona");
             float err = error(neu[length - 1], y[a], layer.neurons);
             float devErr = devError(neu[length - 1], y[a], layer.neurons);
             if (layer.neurons == 1)
-                printf("error: %f, prediccion: %f, y:%f\n", err, neu[length - 1][0], y[a][0]);
+                printf("error: %f, devError: %f, prediccion: %f, y:%f\n", err, devErr, neu[length - 1][0], y[a][0]);
             float delta;
             float devNeu;
             float devAct;
@@ -119,18 +117,23 @@ Model *fit(float **x,
             Layer before = sequential[length - 2];
             for (int j = 0; j < layer.neurons; j++)
             {
-                devNeu = devErr * neu[length - 2][j];
+                devNeu = devErr;
+                printf("derivada neurona: %f    ", devNeu);
                 float *sw = (float *)malloc(sizeof(float) * before.neurons);
                 for (unsigned int k = 0; k < before.neurons; k++)
                 {
                     sw[k] = w[length - 2][k][j];
                 }
                 devAct = neuron(neu[length - 2], sw, b[length - 2], before.neurons, before.derivada);
+                printf("derivada activación: %f\n", devAct);
                 for (int k = 0; k < before.neurons; k++)
                 {
-                    b[length - 2][k] = devNeu * devAct;
                     deltas[length - 2][k][j] = devNeu * devAct;
-                    w[length - 2][k][j] -= delta * neu[length - 2][k];
+                    printf("devZ[%i][%i][%i] = %f\n", length - 2, k, j, deltas[length - 2][k][j]);
+                    b[length - 2][k] -= learningRate * deltas[length - 2][k][j];
+                    printf("b[%i][%i] = %f  ", length - 2, j, b[length - 2][j]);
+                    w[length - 2][k][j] -= learningRate * deltas[length - 2][k][j] * neu[length - 2][k];
+                    printf("w[%i][%i][%i] = %f\n", length - 2, k, j, w[length - 2][k][j]);
                 }
             }
             for (int i = length - 2; i > 0; i--)
@@ -144,13 +147,17 @@ Model *fit(float **x,
                     {
                         sw[k] = w[i - 1][k][j];
                     }
+                    printf("derivada neurona: %f    ", devNeu);
                     devAct = neuron(neu[i - 1], sw, b[i - 1], before.neurons, before.derivada);
+                    printf("derivada activación: %f\n", devAct);
                     for (int k = 0; k < before.neurons; k++)
                     {
-                        devNeu = deltas[i-1][k][j]*w[i-1][k][j];
-                        b[i-1][k] = devNeu * devAct;
-                        deltas[i-1][k][j] = devNeu * devAct;
-                        w[i-1][k][j] -= delta * neu[i-1][k];
+                        devNeu = deltas[i - 1][k][j] * w[i - 1][k][j];
+                        deltas[i - 1][k][j] = devNeu * devAct;
+                        b[i - 1][k] -= learningRate * deltas[i - 1][k][j];
+                        printf("b[%i][%i] = %f  ", length - 2, j, b[i - 1][j]);
+                        w[i - 1][k][j] -= learningRate * delta * neu[i - 1][k];
+                        printf("w[%i][%i][%i] = %f\n", length - 2, k, j, w[i - 1][k][j]);
                     }
                 }
             }
@@ -168,7 +175,7 @@ Model *fit(float **x,
 int main()
 {
     srand(time(NULL));
-    int n = 3;
+    int n = 2;
     float **x = (float **)malloc(sizeof(float *) * 4);
     x[0] = (float *)malloc(sizeof(float) * 2);
     x[0][0] = 0;
@@ -191,17 +198,16 @@ int main()
     y[2][0] = 1;
     y[3] = (float *)malloc(sizeof(float) * 1);
     y[3][0] = 0;
-    Layer inicio = {2, relu, devRelu, "inicio"};
-    Layer medio = {1, relu, devRelu, "medio"};
-    Layer final = {1, relu, devRelu, "final"};
+    Layer inicio = {2, identity, devIdentity, "inicio"};
+    Layer final = {1, identity, devIdentity, "final"};
     Sequential se = (Sequential)malloc(sizeof(Layer) * n);
     se[0] = inicio;
-    se[1] = medio;
-    se[2] = final;
+    se[1] = final;
     Model m = *(fit(x,
                     y,
                     4,
-                    1,
+                    2,
+                    0.5,
                     se,
                     mse,
                     devMse,

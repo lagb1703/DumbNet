@@ -21,7 +21,6 @@ float sigmoidea(float x){
 }
 
 float devSigmoidea(float x){
-    float ex = powf(e, -x);
-    float por = (1 + ex);
-    return 1/(por*por*ex);
+    float s = sigmoidea(x);
+    return s * (1 - s);
 }

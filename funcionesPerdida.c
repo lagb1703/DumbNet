@@ -22,9 +22,10 @@ float rmse(float *predicted, float *actually, int n){
 
 float devMse(float *predicted, float *actually, int n){
     float result = 0.0f;
-    for(unsigned int i = 0; i < n; i++)
+    for(unsigned int i = 0; i < n; i++){
         result += predicted[i] - actually[i];
-    return 2*result;
+    }
+    return 2.0*result;
 }
 
 float devMae(float *predicted, float *actually, int n){
