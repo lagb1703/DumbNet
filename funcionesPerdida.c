@@ -20,15 +20,20 @@ float rmse(float *predicted, float *actually, int n){
     return sqrtf(mse(predicted, actually, n));
 }
 
-float devMse(float predicted, float actually){
-    return 2*(predicted-actually);
+float devMse(float *predicted, float *actually, int n){
+    float result = 0.0f;
+    for(unsigned int i = 0; i < n; i++)
+        result += predicted[i] - actually[i];
+    return 2*result;
 }
 
-float devMae(float predicted, float actually){
-    float micro = predicted - actually;
+float devMae(float *predicted, float *actually, int n){
+    float micro = 0;
+    for(unsigned int i = 0; i < n; i++)
+        micro += predicted[i] - actually[i];
     return (micro)/(micro > 0)?micro:-micro;
 }
 
-float devRmse(float predicted, float actually){
-    return sqrtf(devMse(predicted, actually));
+float devRmse(float *predicted, float *actually, int n){
+    return sqrtf(devMse(predicted, actually, n));
 }
