@@ -21,9 +21,9 @@ static void __w(float *w, unsigned int n)
 {
     for (unsigned int l = 0; l < n; l++)
     {
-        // w[l] = ((float)rand() / RAND_MAX) - 0.5f;
-        w[l] = 0.5;
-        printf("[%i] = %f\n", l, w[l]);
+        w[l] = ((float)rand() / RAND_MAX) - 0.5f;
+        // w[l] = 0.5;
+        // printf("[%i] = %f\n", l, w[l]);
     }
 }
 
@@ -42,24 +42,24 @@ Model *fit(float **x,
            float learningRate,
            Sequential sequential,
            float (*error)(float *, float *, int),
-           float (*devError)(float , float , int),
+           float (*devError)(float, float, int),
            float InitB,
            unsigned int length)
 {
     Layer layer;
     float ***w = (float ***)malloc(sizeof(float **) * (length - 1));
-    float **deltas = (float **)malloc(sizeof(float *) * length);
+    float **dEdz = (float **)malloc(sizeof(float *) * length);
     float **neu = (float **)malloc(sizeof(float *) * length);
     float **z = (float **)malloc(sizeof(float *) * length);
     float **b = (float **)malloc(sizeof(float *) * length);
-    printf("configuración inicial\n");
+    // printf("configuración inicial\n");
     for (int i = 0; i < length; i++)
     {
         layer = sequential[i];
         neu[i] = (float *)malloc(sizeof(float) * layer.neurons);
         z[i] = (float *)malloc(sizeof(float) * layer.neurons);
         b[i] = (float *)malloc(sizeof(float) * layer.neurons);
-        deltas[i] = (float *)calloc(sequential[i].neurons, sizeof(float));
+        dEdz[i] = (float *)calloc(sequential[i].neurons, sizeof(float));
         for (unsigned int bj = 0; bj < layer.neurons; ++bj)
             b[i][bj] = InitB;
         if (i < (length - 1))
@@ -68,18 +68,18 @@ Model *fit(float **x,
             for (unsigned int j = 0; j < layer.neurons; j++)
             {
                 w[i][j] = (float *)malloc(sizeof(float) * (sequential[i + 1].neurons));
-                printf("w[%i][%i]", i, j);
+                // printf("w[%i][%i]", i, j);
                 __w(w[i][j], sequential[i + 1].neurons);
             }
         }
     }
-    printf("entrenamiento:\n");
+    // printf("entrenamiento:\n");
     while (epochs--)
     {
         for (int a = 0; a < n; a++)
         {
             printf("data  %i\n", a);
-            printf("capa  0\n");
+            // printf("capa  0\n");
             for (unsigned int j = 0; j < sequential[0].neurons; j++)
             {
                 neu[0][j] = x[a][j];
@@ -87,21 +87,21 @@ Model *fit(float **x,
             }
             for (unsigned int i = 1; i < length; i++)
             {
-                printf("capa  %i\n", i);
+                // printf("capa  %i\n", i);
                 layer = sequential[i];
                 for (unsigned int j = 0; j < layer.neurons; j++)
                 {
-                    float *sw = (float *)malloc(sizeof(float) * sequential[i - 1].neurons);
+                    float sum = 0;
                     for (unsigned int k = 0; k < sequential[i - 1].neurons; k++)
                     {
-                        sw[k] = w[i - 1][k][j];
+                        sum += w[i - 1][k][j] * neu[i - 1][k];
                     }
-                    z[i][j] = preZ(neu[i - 1], sw, sequential[i - 1].neurons) + b[i][j];
+                    sum += b[i][j];
+                    z[i][j] = sum;
                     neu[i][j] = sequential[i].activacion(z[i][j]);
-                    free(sw);
                     printf("neu[%i][%i] = %f\n", i, j, neu[i][j]);
                 }
-                printf("\n");
+                // printf("\n");
             }
             float err = error(neu[length - 1], y[a], layer.neurons);
             printf("error: %f\n", err);
@@ -109,23 +109,24 @@ Model *fit(float **x,
             float devNeu;
             float devAct;
             layer = sequential[length - 1];
-            Layer before = sequential[length - 2];
             for (int j = 0; j < layer.neurons; ++j)
             {
                 printf("prediccion: %f, real: %f\n", neu[length - 1][j], y[a][j]);
                 float dEdy = devError(neu[length - 1][j], y[a][j], 1);
-                deltas[length - 1][j] = dEdy * sequential[length - 1].derivada(z[length - 1][j]);
+                dEdz[length - 1][j] = dEdy * layer.derivada(z[length - 1][j]);
             }
             for (int i = length - 2; i > 0; --i)
             {
-                for (int j = 0; j < sequential[i].neurons; ++j)
+                layer = sequential[i];
+                unsigned int nextNeurons = sequential[i + 1].neurons;
+                for (int k = 0; k < layer.neurons; ++k)
                 {
                     float sum = 0.0f;
-                    for (int k = 0; k < sequential[i + 1].neurons; ++k)
+                    for (unsigned int m = 0; m < nextNeurons; ++m)
                     {
-                        sum += w[i][j][k] * deltas[i + 1][k];
+                        sum += w[i][k][m] * dEdz[i + 1][m];
                     }
-                    deltas[i][j] = sequential[i].derivada(z[i][j]) * sum;
+                    dEdz[i][k] = sum * layer.derivada(z[i][k]);
                 }
             }
             for (int i = 0; i < length - 1; ++i)
@@ -134,13 +135,13 @@ Model *fit(float **x,
                 {
                     for (int k = 0; k < sequential[i + 1].neurons; ++k)
                     {
-                        float grad = neu[i][j] * deltas[i + 1][k];
+                        float grad = neu[i][j] * dEdz[i + 1][k];
                         w[i][j][k] -= learningRate * grad;
                     }
                 }
                 for (int k = 0; k < sequential[i + 1].neurons; ++k)
                 {
-                    b[i + 1][k] -= learningRate * deltas[i + 1][k];
+                    b[i + 1][k] -= learningRate * dEdz[i + 1][k];
                 }
             }
         }
@@ -156,12 +157,12 @@ Model *fit(float **x,
         free(b[i]);
         free(z[i]);
         free(neu[i]);
-        free(deltas[i]);
+        free(dEdz[i]);
     }
     free(b);
     free(z);
     free(neu);
-    free(deltas);
+    free(dEdz);
     return model;
 }
 
@@ -201,11 +202,11 @@ int main()
     Model m = *(fit(x,
                     y,
                     4,
-                    10,
-                    0.5,
+                    100,
+                    0.1,
                     se,
-                    mse,
-                    devMse,
+                    lostEntropy,
+                    devLostEntropy,
                     0,
                     n));
     free(m.sequential);
